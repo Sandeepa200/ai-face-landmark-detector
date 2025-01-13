@@ -2654,38 +2654,55 @@ export const TRIANGULATION = [
     if (closePath) {
       region.closePath();
     }
-    ctx.strokeStyle = "grey";
+    ctx.strokeStyle = "pink";
     ctx.stroke(region);
   };
   
   // Drawing Mesh
-  export const drawMesh = (predictions, ctx) => {
-    if (predictions.length > 0) {
+// Drawing Mesh
+export const drawMesh = (predictions, ctx) => {
+    if (predictions && predictions.length > 0) {
       predictions.forEach((prediction) => {
-        const keypoints = prediction.scaledMesh;
+        const keypoints = prediction.keypoints;
+        if (!keypoints) return;
   
-        //  Draw Triangles
+        // Get canvas dimensions
+        const canvasWidth = ctx.canvas.width;
+  
+        // Mirror the keypoints
+        const mirroredKeypoints = keypoints.map((keypoint) => ({
+          ...keypoint,
+          x: canvasWidth - keypoint.x, // Mirror the x-coordinate
+        }));
+  
+        // Draw Triangles
+        ctx.strokeStyle = "pink";
+        ctx.lineWidth = 1;
+  
         for (let i = 0; i < TRIANGULATION.length / 3; i++) {
-          // Get sets of three keypoints for the triangle
           const points = [
-            TRIANGULATION[i * 3],
-            TRIANGULATION[i * 3 + 1],
-            TRIANGULATION[i * 3 + 2],
-          ].map((index) => keypoints[index]);
-          //  Draw triangle
-          drawPath(ctx, points, true);
+            mirroredKeypoints[TRIANGULATION[i * 3]],
+            mirroredKeypoints[TRIANGULATION[i * 3 + 1]],
+            mirroredKeypoints[TRIANGULATION[i * 3 + 2]],
+          ];
+  
+          if (points[0] && points[1] && points[2]) {
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            ctx.lineTo(points[1].x, points[1].y);
+            ctx.lineTo(points[2].x, points[2].y);
+            ctx.closePath();
+            ctx.stroke();
+          }
         }
   
         // Draw Dots
-        for (let i = 0; i < keypoints.length; i++) {
-          const x = keypoints[i][0];
-          const y = keypoints[i][1];
-  
+        ctx.fillStyle = "aqua";
+        mirroredKeypoints.forEach((keypoint) => {
           ctx.beginPath();
-          ctx.arc(x, y, 1 /* radius */, 0, 3 * Math.PI);
-          ctx.fillStyle = "aqua";
+          ctx.arc(keypoint.x, keypoint.y, 1, 0, 3 * Math.PI);
           ctx.fill();
-        }
+        });
       });
     }
   };
