@@ -1,68 +1,64 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import * as tf from "@tensorflow/tfjs";
 import * as facemesh from "@tensorflow-models/face-landmarks-detection";
 import Webcam from "react-webcam";
 import { drawMesh } from "./utils";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Play, Square } from "lucide-react";
 
-function App() {
+const App = () => {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
-  let detectInterval = null;
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [detector, setDetector] = useState(null);
+  const detectIntervalRef = useRef(null);
 
-  const runFacemesh = async () => {
+  const initializeDetector = async () => {
     try {
-      // Load the face landmarks model
+      setIsLoading(true);
       const model = facemesh.SupportedModels.MediaPipeFaceMesh;
       const detectorConfig = {
-        runtime: 'tfjs', // Changed from 'mediapipe' to 'tfjs'
+        runtime: 'tfjs',
         refineLandmarks: false,
         maxFaces: 1
       };
 
-      await tf.ready(); // Ensure TensorFlow.js is ready
-      const detector = await facemesh.createDetector(model, detectorConfig);
+      await tf.ready();
+      const faceDetector = await facemesh.createDetector(model, detectorConfig);
+      setDetector(faceDetector);
       console.log("Face detector initialized successfully");
-
-      if (detector) {
-        // Start detection loop
-        detectInterval = setInterval(() => {
-          detect(detector);
-        }, 100);
-      }
     } catch (error) {
       console.error("Error initializing face detector:", error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const detect = async (detector) => {
+  const detect = async () => {
     if (
-      webcamRef.current &&
-      webcamRef.current.video &&
-      webcamRef.current.video.readyState === 4
+      detector &&
+      webcamRef.current?.video?.readyState === 4
     ) {
       try {
         const video = webcamRef.current.video;
         const videoWidth = video.videoWidth;
         const videoHeight = video.videoHeight;
-  
-        // Set dimensions
+
         webcamRef.current.video.width = videoWidth;
         webcamRef.current.video.height = videoHeight;
         canvasRef.current.width = videoWidth;
         canvasRef.current.height = videoHeight;
-  
-        // Get predictions
+
         const predictions = await detector.estimateFaces(video, {
           flipHorizontal: false,
-          predictIrises: false  // Add this to ensure we get the basic face mesh
+          predictIrises: false
         });
-  
+
         if (predictions.length > 0) {
           const ctx = canvasRef.current.getContext("2d");
           ctx.clearRect(0, 0, videoWidth, videoHeight);
-          
-          // Log the first prediction to see its structure
-          console.log("Face prediction structure:", predictions[0]);
           
           requestAnimationFrame(() => {
             drawMesh(predictions, ctx);
@@ -74,44 +70,93 @@ function App() {
     }
   };
 
+  const startDetection = () => {
+    setIsDetecting(true);
+    detectIntervalRef.current = setInterval(detect, 100);
+  };
+
+  const stopDetection = () => {
+    setIsDetecting(false);
+    if (detectIntervalRef.current) {
+      clearInterval(detectIntervalRef.current);
+      detectIntervalRef.current = null;
+    }
+    
+    // Clear canvas
+    if (canvasRef.current) {
+      const ctx = canvasRef.current.getContext("2d");
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    }
+  };
+
   useEffect(() => {
-    // Initialize TensorFlow.js backend
     tf.setBackend('webgl').then(() => {
       console.log("WebGL backend initialized");
-      runFacemesh();
+      initializeDetector();
     }).catch(error => {
       console.error("Error initializing WebGL backend:", error.message);
     });
 
-    // Cleanup function
     return () => {
-      if (detectInterval) {
-        clearInterval(detectInterval);
-      }
+      stopDetection();
     };
   }, []);
 
   return (
-    <div className="w-screen h-screen bg-gray-900">
-      <div className="p-4">
-        <h1 className="text-white text-2xl text-center">
-          Face Mesh Detection
-        </h1>
-        <p className="text-white text-center">Detect 468 facial landmarks</p>
-      </div>
-      <div className="relative w-[640px] h-[480px] mx-auto">
-        <Webcam
-          ref={webcamRef}
-          className="absolute top-0 left-0 z-10 w-full h-full"
-          mirrored={true}
-        />
-        <canvas
-          ref={canvasRef}
-          className="absolute top-0 left-0 z-20 w-full h-full"
-        />
-      </div>
+    <div className="min-h-screen w-screen bg-gray-900 p-8">
+      <Card className="max-w-4xl mx-auto bg-gray-800 border-gray-700">
+        <CardHeader>
+          <CardTitle className="text-3xl font-bold text-white">
+            Face Mesh Detection
+          </CardTitle>
+          <CardDescription className="text-gray-400">
+            Real-time detection of 468 facial landmarks using TensorFlow.js
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div className="flex justify-center gap-4">
+              <Button
+                onClick={startDetection}
+                disabled={isLoading || isDetecting}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Play className="mr-2 h-4 w-4" />
+                Start Detection
+              </Button>
+              <Button
+                onClick={stopDetection}
+                disabled={isLoading || !isDetecting}
+                variant="destructive"
+              >
+                <Square className="mr-2 h-4 w-4" />
+                Stop Detection
+              </Button>
+            </div>
+
+            {isLoading && (
+              <div className="text-center text-white">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-t-blue-500 border-gray-700" />
+                <p className="mt-2">Initializing face detector...</p>
+              </div>
+            )}
+
+            <div className="relative w-[640px] h-[480px] mx-auto rounded-lg overflow-hidden">
+              <Webcam
+                ref={webcamRef}
+                className="absolute top-0 left-0 z-10 w-full h-full"
+                mirrored={true}
+              />
+              <canvas
+                ref={canvasRef}
+                className="absolute top-0 left-0 z-20 w-full h-full"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
-}
+};
 
 export default App;
