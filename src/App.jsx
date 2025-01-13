@@ -5,7 +5,8 @@ import Webcam from "react-webcam";
 import { drawMesh } from "./utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, Square } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Play, Square, AlertCircle, CheckCircle2, Info } from "lucide-react";
 
 const App = () => {
   const webcamRef = useRef(null);
@@ -13,11 +14,20 @@ const App = () => {
   const [isDetecting, setIsDetecting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [detector, setDetector] = useState(null);
+  const [alert, setAlert] = useState(null);
   const detectIntervalRef = useRef(null);
+
+  const showAlert = (type, title, message) => {
+    setAlert({ type, title, message });
+    // Clear alert after 5 seconds
+    setTimeout(() => setAlert(null), 5000);
+  };
 
   const initializeDetector = async () => {
     try {
       setIsLoading(true);
+      showAlert("info", "Initializing", "Setting up the face detection model...");
+      
       const model = facemesh.SupportedModels.MediaPipeFaceMesh;
       const detectorConfig = {
         runtime: 'tfjs',
@@ -28,9 +38,10 @@ const App = () => {
       await tf.ready();
       const faceDetector = await facemesh.createDetector(model, detectorConfig);
       setDetector(faceDetector);
-      console.log("Face detector initialized successfully");
+      showAlert("success", "Ready", "Face detector initialized successfully!");
     } catch (error) {
       console.error("Error initializing face detector:", error.message);
+      showAlert("error", "Error", "Failed to initialize face detector. Please refresh and try again.");
     } finally {
       setIsLoading(false);
     }
@@ -66,6 +77,8 @@ const App = () => {
         }
       } catch (error) {
         console.error("Error during face detection:", error);
+        showAlert("error", "Detection Error", "An error occurred during face detection.");
+        stopDetection();
       }
     }
   };
@@ -73,6 +86,7 @@ const App = () => {
   const startDetection = () => {
     setIsDetecting(true);
     detectIntervalRef.current = setInterval(detect, 100);
+    showAlert("success", "Detection Started", "Face detection is now active.");
   };
 
   const stopDetection = () => {
@@ -87,6 +101,7 @@ const App = () => {
       const ctx = canvasRef.current.getContext("2d");
       ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     }
+    showAlert("info", "Detection Stopped", "Face detection has been stopped.");
   };
 
   useEffect(() => {
@@ -95,12 +110,39 @@ const App = () => {
       initializeDetector();
     }).catch(error => {
       console.error("Error initializing WebGL backend:", error.message);
+      showAlert("error", "Backend Error", "Failed to initialize WebGL backend.");
     });
 
     return () => {
       stopDetection();
     };
   }, []);
+
+  const getAlertStyles = (type) => {
+    switch (type) {
+      case 'error':
+        return 'border-red-500 bg-red-500/10 text-red-500';
+      case 'success':
+        return 'border-green-500 bg-green-500/10 text-green-500';
+      case 'info':
+        return 'border-blue-500 bg-blue-500/10 text-blue-500';
+      default:
+        return '';
+    }
+  };
+
+  const getAlertIcon = (type) => {
+    switch (type) {
+      case 'error':
+        return <AlertCircle className="h-5 w-5" />;
+      case 'success':
+        return <CheckCircle2 className="h-5 w-5" />;
+      case 'info':
+        return <Info className="h-5 w-5" />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="min-h-screen w-screen bg-gray-900 p-8">
@@ -115,6 +157,18 @@ const App = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
+            {alert && (
+              <Alert className={`transition-all duration-300 ${getAlertStyles(alert.type)}`}>
+                <div className="flex items-center gap-2">
+                  {getAlertIcon(alert.type)}
+                  <AlertTitle>{alert.title}</AlertTitle>
+                </div>
+                <AlertDescription className="mt-1">
+                  {alert.message}
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="flex justify-center gap-4">
               <Button
                 onClick={startDetection}
