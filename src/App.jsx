@@ -145,7 +145,7 @@ const App = () => {
   };
 
   return (
-    <div className="min-h-screen w-screen bg-gray-900 p-8">
+    <div className="min-h-screen w-screen bg-gray-900 p-4">
       <Card className="max-w-4xl mx-auto bg-gray-800 border-gray-700">
         <CardHeader>
           <CardTitle className="text-3xl font-bold text-white">
@@ -169,7 +169,7 @@ const App = () => {
               </Alert>
             )}
 
-            <div className="flex justify-center gap-4">
+            <div className="flex flex-col sm:flex-row justify-center gap-4">
               <Button
                 onClick={startDetection}
                 disabled={isLoading || isDetecting}
@@ -195,7 +195,7 @@ const App = () => {
               </div>
             )}
 
-            <div className="relative w-[640px] h-[480px] mx-auto rounded-lg overflow-hidden">
+            <div className="relative w-[230px] h-[200px] sm:w-[640px] sm:h-[480px] mx-auto rounded-lg overflow-hidden">
               <Webcam
                 ref={webcamRef}
                 className="absolute top-0 left-0 z-10 w-full h-full"
